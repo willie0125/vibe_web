@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>晚餐決策抽獎箱 - 🎰 Slot Machine Dinner Picker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Noto+Sans+TC:wght@400;600;800&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Fredoka', 'Noto Sans TC', -apple-system, sans-serif;
+      background: linear-gradient(135deg, #1e1b4b 0%, #311042 50%, #4c0519 100%);
+      min-height: 100vh;
+    }
+
+    /* Custom scrollbar for webkit */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    /* Slot Machine Reel styling */
+    .slot-window {
+      position: relative;
+      height: 120px;
+      overflow: hidden;
+      background: linear-gradient(180deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      box-shadow: inset 0 8px 16px rgba(0, 0, 0, 0.8), inset 0 -8px 16px rgba(0, 0, 0, 0.8);
+      border: 4px solid #fbbf24;
+      border-radius: 16px;
+    }
+
+    .slot-window::before, .slot-window::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 28px;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .slot-window::before {
+      top: 0;
+      background: linear-gradient(to bottom, rgba(15, 23, 42, 0.95), transparent);
+    }
+
+    .slot-window::after {
+      bottom: 0;
+      background: linear-gradient(to top, rgba(15, 23, 42, 0.95), transparent);
+    }
+
+    .slot-reel {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      will-change: transform;
+    }
+
+    .slot-item {
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: #fef08a;
+      text-shadow: 0 0 12px rgba(251, 191, 36, 0.6), 0 2px 4px rgba(0,0,0,0.8);
+      padding: 0 16px;
+      word-break: break-word;
+    }
+
+    /* Neon glow effect for machine title */
+    .neon-text {
+      text-shadow: 0 0 10px rgba(244, 63, 94, 0.6), 0 0 20px rgba(244, 63, 94, 0.4);
+    }
+
+    /* Flashing lights effect */
+    @keyframes bulb-flash {
+      0%, 100% { opacity: 1; filter: drop-shadow(0 0 6px #f59e0b); }
+      50% { opacity: 0.3; filter: none; }
+    }
+
+    .bulb {
+      animation: bulb-flash 1s infinite alternate;
+    }
+    .bulb:nth-child(even) {
+      animation-delay: 0.5s;
+    }
+
+    /* Glass card styling */
+    .glass-panel {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+  </style>
+</head>
+<body class="text-slate-100 flex flex-col items-center justify-start p-4 md:p-6 min-h-screen">
+
+  <div class="w-full max-w-lg mx-auto space-y-6">
+    <header class="text-center space-y-2 mt-2">
+      <div class="inline-flex items-center space-x-2 bg-amber-500/10 border border-amber-500/30 px-4 py-1.5 rounded-full text-amber-300 text-sm font-semibold tracking-wide">
+        <span>🎰 命運晚餐決定器</span>
+      </div>
+      <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-white neon-text">
+        晚餐決策抽獎箱
+      </h1>
+      <p class="text-slate-300 text-sm">不知道今晚吃什麼？讓老虎機幫你轉出好美味！</p>
+    </header>
+
+    <main class="space-y-6">
+      <div class="relative bg-slate-900 border-4 border-amber-500 rounded-3xl p-5 md:p-6 shadow-2xl shadow-amber-500/10 overflow-hidden">
+        <!-- Arcade Light Bulbs Frame Top -->
+        <div class="flex justify-between items-center mb-4 px-2">
+          <div class="flex space-x-2">
+            <span class="w-3 h-3 rounded-full bg-amber-400 bulb"></span>
+            <span class="w-3 h-3 rounded-full bg-rose-500 bulb"></span>
+            <span class="w-3 h-3 rounded-full bg-emerald-400 bulb"></span>
+          </div>
+          <div id="soundToggle" onclick="toggleSound()" class="cursor-pointer text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-2.5 py-1 rounded-full flex items-center space-x-1 transition">
+            <span id="soundIcon">🔊</span>
+            <span id="soundText">音效 ON</span>
+          </div>
+          <div class="flex space-x-2">
+            <span class="w-3 h-3 rounded-full bg-emerald-400 bulb"></span>
+            <span class="w-3 h-3 rounded-full bg-rose-500 bulb"></span>
+            <span class="w-3 h-3 rounded-full bg-amber-400 bulb"></span>
+          </div>
+        </div>
+
+        <!-- The Reel Display Window -->
+        <div class="slot-window shadow-inner mb-6">
+          <div id="slotReel" class="slot-reel">
+            <div class="slot-item text-amber-300">按下下方按鈕開抽！</div>
+          </div>
+        </div>
+
+        <!-- Action Control Buttons -->
+        <div class="flex flex-col sm:flex-row gap-3">
+          <button id="drawBtn" onclick="startSpin()" class="flex-1 py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-500 via-rose-500 to-amber-500 hover:from-amber-400 hover:to-amber-400 text-slate-950 font-black text-xl shadow-lg shadow-rose-500/25 active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100">
+            🎲 開抽今晚晚餐！
+          </button>
+          
+          <button id="redrawBtn" onclick="startSpin()" class="hidden py-4 px-5 rounded-2xl bg-rose-600/30 hover:bg-rose-600/50 border border-rose-500/50 text-rose-200 font-bold text-base active:scale-95 transition-all duration-150">
+            🔄 不想吃這個，重抽！
+          </button>
+        </div>
+      </div>
+
+      <section class="glass-panel rounded-2xl p-5 shadow-xl space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-700/60 pb-3">
+          <div class="flex items-center space-x-2">
+            <span class="text-xl">🥗</span>
+            <h2 class="font-bold text-lg text-slate-100">備選名單</h2>
+            <span id="activeBadge" class="bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold px-2 py-0.5 rounded-full">0</span>
+          </div>
+          <button onclick="resetToDefault()" class="text-xs font-semibold text-slate-400 hover:text-amber-400 underline decoration-dashed underline-offset-4 transition">
+            ↺ 還原預設名單
+          </button>
+        </div>
+
+        <!-- Input for Adding Options -->
+        <div class="flex gap-2">
+          <input type="text" id="customInput" onkeypress="handleKeyPress(event)" placeholder="輸入自訂店家或料理..." class="flex-1 bg-slate-900/80 border border-slate-700 focus:border-amber-400 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 outline-none transition">
+          <button onclick="addCustomOption()" class="bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-sm transition">
+            新增
+          </button>
+        </div>
+
+        <!-- Tag List of Active Options -->
+        <div id="activeContainer" class="flex flex-wrap gap-2 pt-1 max-h-48 overflow-y-auto pr-1">
+          <!-- Active Tags rendered here dynamically -->
+        </div>
+      </section>
+
+      <section class="glass-panel rounded-2xl p-5 shadow-xl space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-700/60 pb-3">
+          <div class="flex items-center space-x-2">
+            <span class="text-xl">🚫</span>
+            <h2 class="font-bold text-lg text-slate-100">已剔除名單</h2>
+            <span id="excludedBadge" class="bg-slate-700/50 border border-slate-600 text-slate-300 text-xs font-bold px-2 py-0.5 rounded-full">0</span>
+          </div>
+          <button onclick="restoreAll()" class="text-xs font-semibold text-emerald-400 hover:text-emerald-300 underline decoration-dashed underline-offset-4 transition">
+            ↩ 全部放回備選
+          </button>
+        </div>
+
+        <p class="text-xs text-slate-400">抽中的店家會自動移至此處，避免本週重複食用。您可以單獨放回或全部還原。</p>
+
+        <!-- Tag List of Excluded Options -->
+        <div id="excludedContainer" class="flex flex-wrap gap-2 pt-1 max-h-40 overflow-y-auto pr-1">
+          <!-- Excluded Tags rendered here dynamically -->
+        </div>
+      </section>
+    </main>
+
+    <footer class="text-center text-xs text-slate-500 py-4">
+      點擊「開抽」啟動老虎機 • 自動避免近期重複 • 單一 HTML 免安裝
+    </footer>
+  </div>
+
+  <script>
+    // Default initial options
+    const DEFAULT_OPTIONS = [
+      "便當 / 排骨飯",
+      "拉麵 / 烏龍麵",
+      "牛肉麵",
+      "小火鍋 / 涮涮鍋",
+      "麥當勞 / 速食",
+      "義大利麵 / 燉飯",
+      "滷肉飯 / 小吃",
+      "健康餐 / 溫沙拉",
+      "韓式料理 / 豆腐鍋",
+      "燒肉飯 / 日式定食"
+    ];
+
+    let activeList = [...DEFAULT_OPTIONS];
+    let excludedList = [];
+    let isSpinning = false;
+    let soundEnabled = true;
+
+    // --- Audio System (Web Audio API Synthesizer) ---
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new AudioCtx();
+      }
+    }
+
+    function playTickSound() {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400 + Math.random() * 200, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.05);
+      } catch (e) {
+        // Fallback or mute if web audio fails
+      }
+    }
+
+    function playWinSound() {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const now = audioCtx.currentTime;
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+        notes.forEach((freq, index) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + index * 0.1);
+          gain.gain.setValueAtTime(0.15, now + index * 0.1);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.1 + 0.3);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now + index * 0.1);
+          osc.stop(now + index * 0.1 + 0.3);
+        });
+      } catch (e) {}
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
+      document.getElementById('soundText').textContent = soundEnabled ? '音效 ON' : '音效 OFF';
+    }
+
+    function init() {
+      renderLists();
+    }
+
+    function renderLists() {
+      const activeContainer = document.getElementById("activeContainer");
+      const excludedContainer = document.getElementById("excludedContainer");
+      const activeBadge = document.getElementById("activeBadge");
+      const excludedBadge = document.getElementById("excludedBadge");
+      const drawBtn = document.getElementById("drawBtn");
+
+      activeBadge.textContent = activeList.length;
+      excludedBadge.textContent = excludedList.length;
+
+      // Render Active Options
+      if (activeList.length === 0) {
+        activeContainer.innerHTML = `<span class="text-xs text-slate-500 py-2">目前沒有備選店家，請手動新增或還原預設。</span>`;
+        drawBtn.disabled = true;
+      } else {
+        activeContainer.innerHTML = activeList.map((item, idx) => `
+          <div class="inline-flex items-center space-x-1.5 bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-slate-200 text-xs font-medium px-3 py-1.5 rounded-xl transition group">
+            <span>${escapeHtml(item)}</span>
+            <button onclick="removeActiveItem(${idx})" class="text-slate-400 hover:text-rose-400 focus:outline-none ml-1 font-bold text-sm leading-none" title="刪除">×</button>
+          </div>
+        `).join('');
+        if (!isSpinning) drawBtn.disabled = false;
+      }
+
+      // Render Excluded Options
+      if (excludedList.length === 0) {
+        excludedContainer.innerHTML = `<span class="text-xs text-slate-500 py-2">尚無剔除的店家</span>`;
+      } else {
+        excludedContainer.innerHTML = excludedList.map((item, idx) => `
+          <div class="inline-flex items-center space-x-1.5 bg-rose-950/40 border border-rose-800/40 text-rose-300 text-xs font-medium px-3 py-1.5 rounded-xl transition">
+            <span class="line-through opacity-75">${escapeHtml(item)}</span>
+            <button onclick="restoreItem(${idx})" class="text-emerald-400 hover:text-emerald-300 font-semibold text-xs ml-1 focus:outline-none" title="放回備選">放回</button>
+          </div>
+        `).join('');
+      }
+    }
+
+    function addCustomOption() {
+      const input = document.getElementById("customInput");
+      const val = input.value.trim();
+      if (val) {
+        activeList.push(val);
+        input.value = "";
+        renderLists();
+      }
+    }
+
+    function handleKeyPress(e) {
+      if (e.key === "Enter") addCustomOption();
+    }
+
+    function removeActiveItem(index) {
+      if (isSpinning) return;
+      activeList.splice(index, 1);
+      renderLists();
+    }
+
+    function restoreItem(index) {
+      if (isSpinning) return;
+      const restored = excludedList.splice(index, 1)[0];
+      activeList.push(restored);
+      renderLists();
+    }
+
+    function restoreAll() {
+      if (isSpinning) return;
+      activeList = activeList.concat(excludedList);
+      excludedList = [];
+      renderLists();
+    }
+
+    function resetToDefault() {
+      if (isSpinning) return;
+      activeList = [...DEFAULT_OPTIONS];
+      excludedList = [];
+      renderLists();
+    }
+
+    function startSpin() {
+      if (isSpinning || activeList.length === 0) return;
+
+      isSpinning = true;
+      const drawBtn = document.getElementById("drawBtn");
+      const redrawBtn = document.getElementById("redrawBtn");
+      const reel = document.getElementById("slotReel");
+
+      drawBtn.disabled = true;
+      redrawBtn.classList.add("hidden");
+
+      // Pick winner
+      const winnerIndex = Math.floor(Math.random() * activeList.length);
+      const winner = activeList[winnerIndex];
+
+      // Build spin sequence for seamless vertical scroll animation
+      const repeatCount = 18;
+      let spinItems = [];
+      for (let i = 0; i < repeatCount; i++) {
+        spinItems = spinItems.concat(shuffleArray([...activeList]));
+      }
+      spinItems.push(winner); // Guarantee final stopping item is the winner
+
+      // Render items inside the reel container
+      reel.innerHTML = spinItems.map(item => `<div class="slot-item">${escapeHtml(item)}</div>`).join('');
+      
+      // Reset position
+      reel.style.transition = "none";
+      reel.style.top = "0px";
+      reel.offsetHeight; // Force browser layout repaint
+
+      // Calculate distance and duration
+      const itemHeight = 120;
+      const totalDistance = (spinItems.length - 1) * itemHeight;
+      const spinDuration = 3200; // 3.2 seconds
+
+      // Audio tick interval synthesizer
+      let tickCount = 0;
+      const totalTicks = 28;
+      const tickInterval = setInterval(() => {
+        playTickSound();
+        tickCount++;
+        if (tickCount >= totalTicks) {
+          clearInterval(tickInterval);
+        }
+      }, spinDuration / totalTicks);
+
+      // Apply cubic-bezier deceleration transition for authentic slot machine feel
+      reel.style.transition = `top ${spinDuration}ms cubic-bezier(0.12, 0.8, 0.25, 1)`;
+      reel.style.top = `-${totalDistance}px`;
+
+      // Trigger completion after animation finishes
+      setTimeout(() => {
+        isSpinning = false;
+        playWinSound();
+
+        // Trigger victory confetti burst
+        if (typeof confetti === 'function') {
+          confetti({
+            particleCount: 60,
+            spread: 70,
+            origin: { y: 0.6 }
+          });
+        }
+
+        // Auto-exclude picked item from active list into excluded list
+        activeList.splice(winnerIndex, 1);
+        excludedList.push(winner);
+
+        // Update lists and controls
+        renderLists();
+        redrawBtn.classList.remove("hidden");
+        drawBtn.disabled = activeList.length === 0;
+
+      }, spinDuration + 150);
+    }
+
+    // Helper functions
+    function shuffleArray(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Initialize application on load
+    window.onload = init;
+  </script>
+</body>
+</html>
